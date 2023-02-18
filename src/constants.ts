@@ -65,14 +65,14 @@ export const getBgPlaneParams = (
         x: 0,
         y: -3.75,
         width: 15,
-        height: 7,
+        height: 7.5,
       };
     case 1:
       return {
         x: 0,
         y: 3.75,
         width: 15,
-        height: 7,
+        height: 7.5,
       };
     case 2:
       return {

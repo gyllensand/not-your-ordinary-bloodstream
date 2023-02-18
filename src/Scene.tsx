@@ -8,6 +8,7 @@ import {
 import { useFrame, useThree } from "@react-three/fiber";
 import { a, useSpring, useSprings } from "@react-spring/three";
 import { RefObject, useCallback, useEffect, useMemo, useRef } from "react";
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import {
   AdditiveBlending,
   DoubleSide,
@@ -39,6 +40,7 @@ import { Bloom, EffectComposer, Noise } from "@react-three/postprocessing";
 import { KernelSize } from "postprocessing";
 import { start } from "tone";
 import { BgObjects } from "./BgObjects";
+import { SpringValue } from "react-spring";
 
 const instrument = pickRandom([0, 1, 1]);
 const pitch = pickRandom(["C#-1", "D-1"]);
@@ -50,7 +52,7 @@ export const colorContrast = getColorContrast(
   hexToRgb(secondaryColor)
 );
 const hasbgPlane = pickRandom([
-  ...new Array(9).fill(null).map(() => false),
+  ...new Array(8).fill(null).map(() => false),
   true,
 ]);
 const bgPlaneType = pickRandom([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
@@ -60,7 +62,7 @@ const hasMetalness = pickRandom([
   1,
   2,
 ]);
-console.log(bgColor, primaryColor);
+
 const texturePattern = pickRandom([0, 1]);
 const hasTexturePattern = pickRandom([
   ...new Array(4).fill(null).map(() => false),
@@ -103,13 +105,16 @@ const shapeParameters = new Array(shapeCount)
     }
     let i = 0;
     let doneIterating = false;
+    let needsExtra = false;
     let item = {} as ShapeParam;
 
     while (!doneIterating) {
-      const currentRadius = pickRandom([
-        pickRandomDecimalFromInterval(0.5, 5),
-        pickRandomDecimalFromInterval(1, 5),
-      ]);
+      const currentRadius = needsExtra
+        ? pickRandomDecimalFromInterval(0.5, 0.5)
+        : pickRandom([
+            pickRandomDecimalFromInterval(0.5, 5),
+            pickRandomDecimalFromInterval(1, 5),
+          ]);
       const x = pickRandomDecimalFromInterval(-4, 4);
       const y = pickRandomDecimalFromInterval(-4, 4);
 
@@ -151,6 +156,15 @@ const shapeParameters = new Array(shapeCount)
       i++;
 
       if (i === 10000) {
+        if (array.length === 1) {
+          needsExtra = true;
+        } else {
+          doneIterating = true;
+          return array;
+        }
+      }
+
+      if (i === 15000) {
         doneIterating = true;
         return array;
       }
@@ -165,6 +179,9 @@ window.$fxhashFeatures = {
   instrument,
   pitch,
   bgColor,
+  primaryColor,
+  secondaryColor,
+  shapeCount,
 };
 
 function Line({
@@ -366,42 +383,24 @@ const Shape = ({
   texture: { map: Texture };
   aspect: number;
 }) => {
-  const [shapeSpring, setShapeSpring] = useSpring(() => ({
-    scale: [1, 1, 1],
-  }));
   const [ringSprings, setRingSprings] = useSprings(rings.length, (i) => ({
     scale: [1, 1, 1],
-    position: [0, 0, 0],
   }));
-
-  // useEffect(() => {
-  //   setShapeSpring.start((i) => ({
-  //     from: {
-  //       scale: [1, 1, 1],
-  //     },
-  //     to: {
-  //       scale: [0.9, 1, 1],
-  //     },
-  //     loop: { reverse: true },
-  //     config: { mass: 10, tension: 50, friction: 25 },
-  //   }));
-  // }, [setShapeSpring]);
-
+  
   // useEffect(() => {
   //   setRingSprings.start((i) => ({
   //     from: {
   //       scale: [1, 1, 1],
-  //       position: [0, 0, 0],
   //     },
   //     to: {
-  //       scale: [0.9, 0.9, 0.9],
-  //       position: [0, 0, 0],
+  //       scale: [0.95, 0.95, 0.95],
   //     },
   //     delay: i * 100,
   //     loop: { reverse: true },
-  //     config: { mass: 10, tension: 150, friction: 25 },
+  //     config: { mass: 5, tension: 150, friction: 25 },
   //   }));
   // }, [setRingSprings, aspect, rings]);
+
   const backgroundOpacity = useMemo(
     () => pickRandomDecimalFromInterval(0.1, 0.3),
     []
@@ -437,13 +436,9 @@ const Shape = ({
   );
 
   return (
-    // @ts-ignore
-    <a.group {...shapeSpring}>
+    <group>
       {rings.map((o, i) => (
-        // @ts-ignore
-        <a.group key={i} {...ringSprings[i]}>
-          <Ring {...o} aspect={aspect} />
-        </a.group>
+        <Ring key={i} {...o} springs={ringSprings[i]} aspect={aspect} />
       ))}
       {hasBackground && (
         <mesh position={pos}>
@@ -469,7 +464,7 @@ const Shape = ({
           />
         </mesh>
       )}
-    </a.group>
+    </group>
   );
 };
 
@@ -477,6 +472,7 @@ const Ring = ({
   innerRadius,
   thetaStart,
   thetaLength,
+  thetaSpeed,
   outerRadius,
   factor,
   color,
@@ -487,49 +483,48 @@ const Ring = ({
   alteredIndex,
   metalness,
   roughness,
-}: RingProps & { aspect: number }) => {
+  springs,
+}: RingProps & {
+  aspect: number;
+  springs: {
+    scale: SpringValue<number[]>;
+  };
+}) => {
   const ref = useRef<Mesh<RingGeometry>>();
-  const lastInnerRadius = useRef(innerRadius);
   const lastThetaStart = useRef(thetaStart);
-  const lastThetaLength = useRef(thetaLength);
   let geometry = useMemo(
     () =>
       new RingBufferGeometry(
-        lastInnerRadius.current,
-        outerRadius,
+        getSizeByAspect(innerRadius, aspect),
+        getSizeByAspect(outerRadius, aspect),
         128,
         2,
         lastThetaStart.current,
-        lastThetaLength.current
+        thetaLength
       ),
-    [outerRadius]
+    [outerRadius, innerRadius, thetaLength, aspect]
   );
 
-  // useFrame(({ clock }) => {
-  //   if (!ref.current) {
-  //     return;
-  //   }
+  useFrame(({ clock }) => {
+    if (!ref.current) {
+      return;
+    }
 
-  //   // lastInnerRadius.current -=
-  //   //   Math.sin(clock.getElapsedTime() / (ring.thetaSpeed / 100)) / 1000;
+    lastThetaStart.current +=
+      (Math.sin(clock.getElapsedTime() / 2) / thetaSpeed) * 2;
 
-  //   // lastThetaStart.current +=
-  //   //   Math.sin(clock.getElapsedTime()) / ring.thetaSpeed;
-  //   // lastThetaLength.current =
-  //   //   ring.thetaLength + Math.sin(clock.getElapsedTime() / ring.thetaSpeed) * 2;
+    geometry = new RingBufferGeometry(
+      getSizeByAspect(innerRadius, aspect),
+      getSizeByAspect(outerRadius, aspect),
+      128,
+      2,
+      lastThetaStart.current,
+      thetaLength
+    );
 
-  //   geometry = new RingBufferGeometry(
-  //     lastInnerRadius.current,
-  //     ring.outerRadius,
-  //     128,
-  //     2,
-  //     lastThetaStart.current,
-  //     lastThetaLength.current
-  //   );
-
-  //   ref.current.geometry.dispose();
-  //   ref.current.geometry = geometry;
-  // });
+    ref.current.geometry.dispose();
+    ref.current.geometry = geometry;
+  });
 
   const pos = useMemo(
     () =>
@@ -550,8 +545,9 @@ const Ring = ({
   );
 
   return (
-    <mesh ref={ref} position={pos}>
-      <ringBufferGeometry
+    // @ts-ignore
+    <a.mesh ref={ref} position={pos} {...springs} geometry={geometry}>
+      {/* <ringBufferGeometry
         args={[
           getSizeByAspect(innerRadius, aspect),
           getSizeByAspect(outerRadius, aspect),
@@ -560,7 +556,7 @@ const Ring = ({
           thetaStart,
           thetaLength,
         ]}
-      />
+      /> */}
       <MeshWobbleMaterial
         factor={getSizeByAspect(factor, aspect, true, 2)}
         speed={0}
@@ -573,7 +569,7 @@ const Ring = ({
         roughness={hasMetalness ? (metalness !== 0 ? roughness : 0) : 0}
         metalness={hasMetalness ? metalness : 0}
       />
-    </mesh>
+    </a.mesh>
   );
 };
 
@@ -582,6 +578,7 @@ const Scene = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
     aspect: state.viewport.aspect,
   }));
 
+  const controls = useRef<OrbitControlsImpl>(null)
   const texture = useTexture({
     map: `${process.env.PUBLIC_URL}/textures/pattern.jpg`,
   });
@@ -621,11 +618,11 @@ const Scene = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
     () => shapes.map((o) => ({ x: o[0].posX, y: o[0].posY })),
     []
   );
-  console.log(colorContrast);
+
   return (
     <>
       <color attach="background" args={[bgColor]} />
-      <OrbitControls enabled={true} />
+      <OrbitControls ref={controls} enabled={true} />
       <ambientLight />
 
       {hasMetalness ? (
@@ -655,7 +652,7 @@ const Scene = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
         secondaryColor={secondaryColor}
         aspect={aspect}
       />
-      {hasbgPlane ? (
+      {hasbgPlane || shapeParameters.length === 1 ? (
         <mesh
           position={[
             getSizeByWidthAspect(bgPlaneParams.x, aspect),
