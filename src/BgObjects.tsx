@@ -6,9 +6,9 @@ import {
   AdditiveBlending,
   Vector3,
 } from "three";
+import { colorContrast } from "./Scene";
 import {
-  getColorContrast,
-  hexToRgb,
+  getSizeByAspect,
   pickRandom,
   pickRandomDecimalFromInterval,
   pickRandomIntFromInterval,
@@ -20,9 +20,11 @@ const bgShape = pickRandom([0, 1]);
 export function BgObjects({
   bgColor,
   secondaryColor,
+  aspect,
 }: {
   bgColor: string;
   secondaryColor: string;
+  aspect: number;
 }) {
   const bgObjects = useMemo(
     () =>
@@ -65,9 +67,9 @@ export function BgObjects({
         bgObjects[i].position.z
       );
       tempObject.scale.set(
-        bgObjects[i].scale,
-        bgObjects[i].scale,
-        bgObjects[i].scale
+        getSizeByAspect(bgObjects[i].scale, aspect),
+        getSizeByAspect(bgObjects[i].scale, aspect),
+        getSizeByAspect(bgObjects[i].scale, aspect)
       );
       tempObject.updateMatrix();
 
@@ -77,14 +79,7 @@ export function BgObjects({
     }
 
     meshRef.current!.instanceMatrix.needsUpdate = true;
-  }, [tempObject, bgObjects]);
-
-  const colorContrast = useMemo(
-    () => getColorContrast(hexToRgb(bgColor), hexToRgb(secondaryColor)),
-    [bgColor, secondaryColor]
-  );
-
-  console.log(colorContrast);
+  }, [tempObject, bgObjects, aspect]);
 
   return (
     <instancedMesh
@@ -110,13 +105,14 @@ export function BgObjects({
         blending={AdditiveBlending}
         depthWrite={false}
         toneMapped={false}
+        transparent
         opacity={
           bgShape === 0
             ? colorContrast > 5
               ? 0.02
               : 0.05
             : colorContrast > 3.5
-            ? 0.05
+            ? 0.075
             : 0.3
         }
         vertexColors

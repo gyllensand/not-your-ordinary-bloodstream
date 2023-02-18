@@ -20,13 +20,21 @@ import {
 } from "three";
 import { isMobile } from "react-device-detect";
 import {
+  getColorContrast,
   getSizeByAspect,
+  getSizeByWidthAspect,
+  hexToRgb,
   pickRandom,
   pickRandomColorWithTheme,
   pickRandomDecimalFromInterval,
   pickRandomIntFromInterval,
 } from "./utils";
-import { COLORS, BG_COLORS, LIGHT_BG_COLORS, PALETTES } from "./constants";
+import {
+  COLORS,
+  BG_COLORS,
+  STRIPE_COLORS,
+  getBgPlaneParams,
+} from "./constants";
 import { Bloom, EffectComposer, Noise } from "@react-three/postprocessing";
 import { KernelSize } from "postprocessing";
 import { start } from "tone";
@@ -36,13 +44,29 @@ const instrument = pickRandom([0, 1, 1]);
 const pitch = pickRandom(["C#-1", "D-1"]);
 const bgColor = pickRandom(BG_COLORS);
 const primaryColor = pickRandom(COLORS);
-const secondaryColor = pickRandom(COLORS);
+const secondaryColor = pickRandom(STRIPE_COLORS);
+export const colorContrast = getColorContrast(
+  hexToRgb(bgColor),
+  hexToRgb(secondaryColor)
+);
+const hasbgPlane = pickRandom([
+  ...new Array(9).fill(null).map(() => false),
+  true,
+]);
+const bgPlaneType = pickRandom([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+const bgPlaneParams = getBgPlaneParams(bgPlaneType);
+const hasMetalness = pickRandom([
+  ...new Array(28).fill(null).map(() => 0),
+  1,
+  2,
+]);
 console.log(bgColor, primaryColor);
 const texturePattern = pickRandom([0, 1]);
 const hasTexturePattern = pickRandom([
-  ...new Array(5).fill(null).map(() => false),
+  ...new Array(4).fill(null).map(() => false),
   true,
 ]);
+const hasLines = pickRandom([false, false, false, true]);
 
 interface ShapeParam {
   x: number;
@@ -143,18 +167,53 @@ window.$fxhashFeatures = {
   bgColor,
 };
 
-function Line({ start, end }: { start: Vector3; end: Vector3 }) {
+function Line({
+  start,
+  end,
+  aspect,
+}: {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  aspect: number;
+}) {
   return (
-    <QuadraticBezierLine
-      lineWidth={1}
-      start={start}
-      end={end}
-      blending={AdditiveBlending}
-      depthWrite={false}
-      toneMapped={false}
-      // @ts-ignore
-      color={primaryColor}
-    />
+    <>
+      <QuadraticBezierLine
+        lineWidth={0.2}
+        start={[
+          getSizeByAspect(start.x, aspect),
+          getSizeByAspect(start.y, aspect),
+          0,
+        ]}
+        end={[
+          getSizeByAspect(end.x, aspect),
+          getSizeByAspect(end.y, aspect),
+          0,
+        ]}
+        blending={AdditiveBlending}
+        depthWrite={false}
+        toneMapped={false}
+        opacity={0.5}
+        // @ts-ignore
+        color={secondaryColor}
+      />
+      <mesh
+        position={[
+          getSizeByAspect(start.x, aspect),
+          getSizeByAspect(start.y, aspect),
+          0,
+        ]}
+      >
+        <circleBufferGeometry args={[getSizeByAspect(0.05, aspect), 64]} />
+        <meshStandardMaterial
+          color={secondaryColor}
+          blending={AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+          opacity={0.5}
+        />
+      </mesh>
+    </>
   );
 }
 
@@ -162,16 +221,20 @@ interface RingProps {
   innerRadius: number;
   outerRadius: number;
   color: string;
-  position: Vector3;
   thetaStart: number;
   thetaLength: number;
   factor: number;
   thetaSpeed: number;
   wireframe: boolean;
   index: number;
+  alteredIndex: number;
   hasBackground: boolean;
   backgroundIndex: number;
   hasTexture: boolean;
+  posX: number;
+  posY: number;
+  metalness: number;
+  roughness: number;
 }
 
 const ringFactors = [
@@ -202,7 +265,7 @@ const shapes = shapeParameters.map<RingProps[]>((shape) => {
   const ringCount =
     shapeParameters.length > 1
       ? pickRandom([
-          1,
+          pickRandom([1, 2]),
           ...new Array(30)
             .fill(null)
             .map(() =>
@@ -227,42 +290,32 @@ const shapes = shapeParameters.map<RingProps[]>((shape) => {
     radiusOffsets[Math.round(shape.radius) - 1][1]
   );
   const hasTexture = hasTexturePattern
-    ? pickRandom([...new Array(9).fill(null).map(() => false), true])
+    ? pickRandom([...new Array(4).fill(null).map(() => false), true])
     : false;
 
   const hasBackground = hasTexture
     ? true
     : ringCount < 2
     ? false
-    : pickRandom([...new Array(9).fill(null).map(() => false), true]);
+    : pickRandom([...new Array(7).fill(null).map(() => false), true]);
 
-  const backgroundIndex = hasTexture ? 0 : pickRandom([0, 1]);
+  const backgroundIndex = hasTexture || !hasBackground ? 0 : pickRandom([0, 1]);
 
   return new Array(ringCount).fill(null).map<RingProps>((o, index) => {
-    const currentIndex = pickRandom([
-      ...new Array(10).fill(null).map(() => index),
-      0,
+    const alteredIndex = pickRandom([
+      ...new Array(8).fill(null).map(() => index),
       pickRandom([...new Array(ringCount).fill(null).map((_, i) => i)]),
     ]);
 
     const innerRadius =
       ringCount < 2
         ? shape.radius / 2
-        : shape.radius - innerRadiusOffset - currentIndex * 0.1;
-    const outerRadius = shape.radius - currentIndex * 0.1;
+        : shape.radius - innerRadiusOffset - alteredIndex * 0.1;
+    const outerRadius = shape.radius - alteredIndex * 0.1;
     const color = pickRandomColorWithTheme(
       primaryColor,
       COLORS,
       COLORS.length * 3
-    );
-    const position = new Vector3(
-      shape.x > 0
-        ? shape.x + currentIndex * (Math.abs(shape.x) * 0.1)
-        : shape.x - currentIndex * (Math.abs(shape.x) * 0.1),
-      shape.y > 0
-        ? shape.y + currentIndex * (Math.abs(shape.y) * 0.1)
-        : shape.y - currentIndex * (Math.abs(shape.y) * 0.1),
-      -currentIndex
     );
     const thetaStart = pickRandomDecimalFromInterval(
       theta - pickRandomDecimalFromInterval(0.05, 0.1),
@@ -280,20 +333,23 @@ const shapes = shapeParameters.map<RingProps[]>((shape) => {
       ringCount === 1 && shape.radius > 3
         ? false
         : pickRandom([false, false, false, false, true]);
+    const metalness = pickRandom([0, 0.8]);
 
     return {
-      // roughness,
-      // metalness,
+      roughness: metalness === 0 ? 1 : 0.4,
+      metalness: metalness,
       innerRadius,
       outerRadius,
       color,
-      position,
+      posX: shape.x,
+      posY: shape.y,
       thetaStart,
       thetaSpeed,
       thetaLength,
       factor,
       wireframe,
       index,
+      alteredIndex,
       hasBackground,
       backgroundIndex,
       hasTexture,
@@ -304,42 +360,97 @@ const shapes = shapeParameters.map<RingProps[]>((shape) => {
 const Shape = ({
   rings,
   texture,
+  aspect,
 }: {
   rings: RingProps[];
   texture: { map: Texture };
+  aspect: number;
 }) => {
-  const [springs, setSprings] = useSprings(rings.length, (i) => ({
+  const [shapeSpring, setShapeSpring] = useSpring(() => ({
     scale: [1, 1, 1],
+  }));
+  const [ringSprings, setRingSprings] = useSprings(rings.length, (i) => ({
+    scale: [1, 1, 1],
+    position: [0, 0, 0],
   }));
 
   // useEffect(() => {
-  //   setSprings.start((i) => ({
+  //   setShapeSpring.start((i) => ({
   //     from: {
   //       scale: [1, 1, 1],
   //     },
   //     to: {
-  //       scale: [0.9, 0.9, 0.9],
+  //       scale: [0.9, 1, 1],
   //     },
-  //     delay: i * 100,
   //     loop: { reverse: true },
   //     config: { mass: 10, tension: 50, friction: 25 },
   //   }));
-  // }, [setSprings]);
+  // }, [setShapeSpring]);
+
+  // useEffect(() => {
+  //   setRingSprings.start((i) => ({
+  //     from: {
+  //       scale: [1, 1, 1],
+  //       position: [0, 0, 0],
+  //     },
+  //     to: {
+  //       scale: [0.9, 0.9, 0.9],
+  //       position: [0, 0, 0],
+  //     },
+  //     delay: i * 100,
+  //     loop: { reverse: true },
+  //     config: { mass: 10, tension: 150, friction: 25 },
+  //   }));
+  // }, [setRingSprings, aspect, rings]);
+  const backgroundOpacity = useMemo(
+    () => pickRandomDecimalFromInterval(0.1, 0.3),
+    []
+  );
+  const { backgroundIndex } = useMemo(() => rings[0], [rings]);
+  const {
+    posX,
+    posY,
+    alteredIndex,
+    hasBackground,
+    hasTexture,
+    color,
+    factor,
+    outerRadius,
+  } = useMemo(() => rings[backgroundIndex], [rings, backgroundIndex]);
+
+  const pos = useMemo(
+    () =>
+      new Vector3(
+        posX > 0
+          ? getSizeByAspect(posX, aspect) +
+            alteredIndex * (Math.abs(getSizeByAspect(posX, aspect)) * 0.1)
+          : getSizeByAspect(posX, aspect) -
+            alteredIndex * (Math.abs(getSizeByAspect(posX, aspect)) * 0.1),
+        posY > 0
+          ? getSizeByAspect(posY, aspect) +
+            alteredIndex * (Math.abs(getSizeByAspect(posY, aspect)) * 0.1)
+          : getSizeByAspect(posY, aspect) -
+            alteredIndex * (Math.abs(getSizeByAspect(posY, aspect)) * 0.1),
+        -alteredIndex
+      ),
+    [posX, posY, alteredIndex, aspect]
+  );
 
   return (
-    <group>
+    // @ts-ignore
+    <a.group {...shapeSpring}>
       {rings.map((o, i) => (
         // @ts-ignore
-        <a.group key={i} {...springs[i]}>
-          <Ring {...o} />
+        <a.group key={i} {...ringSprings[i]}>
+          <Ring {...o} aspect={aspect} />
         </a.group>
       ))}
-      {rings[0].hasBackground && (
-        <mesh position={rings[rings[0].backgroundIndex].position}>
+      {hasBackground && (
+        <mesh position={pos}>
           <ringBufferGeometry
             args={[
               0,
-              rings[rings[0].backgroundIndex].outerRadius,
+              getSizeByAspect(outerRadius, aspect),
               128,
               2,
               0,
@@ -347,37 +458,51 @@ const Shape = ({
             ]}
           />
           <MeshWobbleMaterial
-            factor={rings[rings[0].backgroundIndex].factor}
+            factor={getSizeByAspect(factor, aspect, true, 2)}
             speed={0}
-            color={rings[rings[0].backgroundIndex].color}
+            color={color}
             blending={AdditiveBlending}
             depthWrite={false}
             toneMapped={false}
-            opacity={0.1}
-            map={rings[0].hasTexture ? texture.map : undefined}
+            opacity={backgroundOpacity}
+            map={hasTexture ? texture.map : undefined}
           />
         </mesh>
       )}
-    </group>
+    </a.group>
   );
 };
 
-const Ring = (ring: RingProps) => {
+const Ring = ({
+  innerRadius,
+  thetaStart,
+  thetaLength,
+  outerRadius,
+  factor,
+  color,
+  wireframe,
+  aspect,
+  posX,
+  posY,
+  alteredIndex,
+  metalness,
+  roughness,
+}: RingProps & { aspect: number }) => {
   const ref = useRef<Mesh<RingGeometry>>();
-  const lastInnerRadius = useRef(ring.innerRadius);
-  const lastThetaStart = useRef(ring.thetaStart);
-  const lastThetaLength = useRef(ring.thetaLength);
+  const lastInnerRadius = useRef(innerRadius);
+  const lastThetaStart = useRef(thetaStart);
+  const lastThetaLength = useRef(thetaLength);
   let geometry = useMemo(
     () =>
       new RingBufferGeometry(
         lastInnerRadius.current,
-        ring.outerRadius,
+        outerRadius,
         128,
         2,
         lastThetaStart.current,
         lastThetaLength.current
       ),
-    [ring]
+    [outerRadius]
   );
 
   // useFrame(({ clock }) => {
@@ -406,27 +531,47 @@ const Ring = (ring: RingProps) => {
   //   ref.current.geometry = geometry;
   // });
 
+  const pos = useMemo(
+    () =>
+      new Vector3(
+        posX > 0
+          ? getSizeByAspect(posX, aspect) +
+            alteredIndex * (Math.abs(getSizeByAspect(posX, aspect)) * 0.1)
+          : getSizeByAspect(posX, aspect) -
+            alteredIndex * (Math.abs(getSizeByAspect(posX, aspect)) * 0.1),
+        posY > 0
+          ? getSizeByAspect(posY, aspect) +
+            alteredIndex * (Math.abs(getSizeByAspect(posY, aspect)) * 0.1)
+          : getSizeByAspect(posY, aspect) -
+            alteredIndex * (Math.abs(getSizeByAspect(posY, aspect)) * 0.1),
+        -alteredIndex
+      ),
+    [posX, posY, alteredIndex, aspect]
+  );
+
   return (
-    <mesh ref={ref} position={ring.position}>
+    <mesh ref={ref} position={pos}>
       <ringBufferGeometry
         args={[
-          ring.innerRadius,
-          ring.outerRadius,
+          getSizeByAspect(innerRadius, aspect),
+          getSizeByAspect(outerRadius, aspect),
           128,
           2,
-          ring.thetaStart,
-          ring.thetaLength,
+          thetaStart,
+          thetaLength,
         ]}
       />
       <MeshWobbleMaterial
-        factor={ring.factor}
+        factor={getSizeByAspect(factor, aspect, true, 2)}
         speed={0}
-        color={ring.color}
+        color={color}
         blending={AdditiveBlending}
         depthWrite={false}
         toneMapped={false}
         side={DoubleSide}
-        wireframe={ring.wireframe}
+        wireframe={wireframe}
+        roughness={hasMetalness ? (metalness !== 0 ? roughness : 0) : 0}
+        metalness={hasMetalness ? metalness : 0}
       />
     </mesh>
   );
@@ -472,39 +617,74 @@ const Scene = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
   //   };
   // }, [onPointerDown, canvasRef]);
 
-  const linePaths = useMemo(() => shapes.map((o) => o[0].position), []);
-
+  const linePaths = useMemo(
+    () => shapes.map((o) => ({ x: o[0].posX, y: o[0].posY })),
+    []
+  );
+  console.log(colorContrast);
   return (
     <>
       <color attach="background" args={[bgColor]} />
       <OrbitControls enabled={true} />
       <ambientLight />
 
-      <group
-        scale={[
-          getSizeByAspect(1, aspect),
-          getSizeByAspect(1, aspect),
-          getSizeByAspect(1, aspect),
-        ]}
-      >
+      {hasMetalness ? (
+        <spotLight
+          position={[0, 0, 20]}
+          penumbra={0.5}
+          angle={0.25}
+          intensity={1}
+        />
+      ) : null}
+
+      <group>
         {shapes.map((shape, i) => (
           <Float rotationIntensity={0} key={i}>
             <Shape
               key={i}
               rings={shape}
+              aspect={aspect}
               texture={texturePattern === 0 ? texture : texture2}
             />
           </Float>
         ))}
-
-        <BgObjects bgColor={bgColor} secondaryColor={secondaryColor} />
-
-        {/* {linePaths.map((path, i, arr) =>
-          i < arr.length - 1 ? (
-            <Line key={i} start={path} end={arr[i + 1]} />
-          ) : null
-        )} */}
       </group>
+
+      <BgObjects
+        bgColor={bgColor}
+        secondaryColor={secondaryColor}
+        aspect={aspect}
+      />
+      {hasbgPlane ? (
+        <mesh
+          position={[
+            getSizeByWidthAspect(bgPlaneParams.x, aspect),
+            bgPlaneParams.y,
+            -6,
+          ]}
+        >
+          <planeBufferGeometry
+            args={[
+              getSizeByWidthAspect(bgPlaneParams.width, aspect),
+              bgPlaneParams.height,
+            ]}
+          />
+          <meshStandardMaterial
+            color={secondaryColor}
+            blending={AdditiveBlending}
+            depthWrite={false}
+            toneMapped={false}
+            opacity={0.1}
+          />
+        </mesh>
+      ) : null}
+
+      {hasLines &&
+        linePaths.map((path, i, arr) =>
+          i < arr.length - 1 ? (
+            <Line key={i} start={path} end={arr[i + 1]} aspect={aspect} />
+          ) : null
+        )}
 
       {!isMobile ? (
         <EffectComposer>

@@ -51,8 +51,19 @@ export const range = (
   a: number
 ) => MathUtils.lerp(x2, y2, MathUtils.inverseLerp(x1, y1, a));
 
-export const getSizeByAspect = (size: number, aspect: number) =>
-  aspect > 1 ? size : size * aspect;
+export const getSizeByAspect = (
+  size: number,
+  aspect: number,
+  invert?: boolean,
+  invertFactor = 1
+) =>
+  invert
+    ? aspect > 1
+      ? size
+      : size * (1 + (1 - aspect) * invertFactor)
+    : aspect > 1
+    ? size
+    : size * aspect;
 
 export const getSizeByWidthAspect = (size: number, aspect: number) =>
   aspect > 1 ? size * aspect : size;
