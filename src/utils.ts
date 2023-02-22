@@ -196,3 +196,21 @@ export const getColorContrast = (
 
   return (brightest + 0.05) / (darkest + 0.05);
 };
+
+export const pickRandoms = <T>(array: T[], count: number, rndFn = fxrand) => {
+  const result = new Array(count);
+  let len = array.length;
+  const taken = new Array(len);
+
+  if (count > len) {
+    throw new RangeError("getRandom: more elements taken than available");
+  }
+
+  while (count--) {
+    const x = Math.floor(rndFn() * len);
+
+    result[count] = array[x in taken ? taken[x] : x];
+    taken[x] = --len in taken ? taken[len] : len;
+  }
+  return result;
+};

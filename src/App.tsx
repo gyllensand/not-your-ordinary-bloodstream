@@ -2,6 +2,7 @@ import { Suspense, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import Scene from "./Scene";
 import { Sampler } from "tone";
+import { Stats } from "@react-three/drei";
 
 console.log(
   "%c * Computer Emotions * ",
@@ -22,17 +23,15 @@ export interface Sample {
 
 const App = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
   return (
     <Canvas
       ref={canvasRef}
       camera={{ position: [0, 0, 10], fov: 50 }}
       dpr={window.devicePixelRatio}
-      gl={{ preserveDrawingBuffer: true }}
-      shadows
     >
       <Suspense fallback={null}>
         <Scene canvasRef={canvasRef} />
+        <Stats />
       </Suspense>
     </Canvas>
   );

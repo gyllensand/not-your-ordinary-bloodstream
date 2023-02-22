@@ -1,4 +1,6 @@
+import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useEffect } from "react";
+import { isMobile } from "react-device-detect";
 import {
   Color,
   Object3D,
@@ -9,6 +11,7 @@ import {
 import { colorContrast } from "./Scene";
 import {
   getSizeByAspect,
+  minMaxNumber,
   pickRandom,
   pickRandomDecimalFromInterval,
   pickRandomIntFromInterval,
@@ -35,10 +38,11 @@ export function BgObjects({
         ]),
         shape: bgShape,
         scale: pickRandomDecimalFromInterval(0.2, 0.8),
+        positionOffset: pickRandomDecimalFromInterval(2, 10),
         position: new Vector3(
           pickRandomDecimalFromInterval(-5, 5),
           pickRandomDecimalFromInterval(-5, 5),
-          0
+          pickRandomDecimalFromInterval(-3, 0)
         ),
       })),
     [bgColor, secondaryColor]
@@ -81,6 +85,35 @@ export function BgObjects({
     meshRef.current!.instanceMatrix.needsUpdate = true;
   }, [tempObject, bgObjects, aspect]);
 
+  useFrame((state) => {
+    if (isMobile) {
+      return;
+    }
+
+    let i = 0;
+
+    for (let x = 0; x < bgObjects.length; x++) {
+      tempObject.position.set(
+        bgObjects[i].position.x + state.mouse.x / bgObjects[i].positionOffset,
+        bgObjects[i].position.y +
+          -(Math.PI / 2 + state.mouse.y / bgObjects[i].positionOffset),
+        bgObjects[i].position.z
+      );
+      tempObject.scale.set(
+        getSizeByAspect(bgObjects[i].scale, aspect),
+        getSizeByAspect(bgObjects[i].scale, aspect),
+        getSizeByAspect(bgObjects[i].scale, aspect)
+      );
+      tempObject.updateMatrix();
+
+      const id = i++;
+      meshRef.current!.geometry.attributes.color.needsUpdate = true;
+      meshRef.current!.setMatrixAt(id, tempObject.matrix);
+    }
+
+    meshRef.current!.instanceMatrix.needsUpdate = true;
+  });
+
   return (
     <instancedMesh
       ref={meshRef}
@@ -112,8 +145,8 @@ export function BgObjects({
               ? 0.02
               : 0.05
             : colorContrast > 3.5
-            ? 0.075
-            : 0.3
+            ? 0.1
+            : 0.4
         }
         vertexColors
       />
