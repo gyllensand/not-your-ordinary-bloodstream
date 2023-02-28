@@ -11,14 +11,13 @@ import {
 import { colorContrast } from "./Scene";
 import {
   getSizeByAspect,
-  minMaxNumber,
   pickRandom,
   pickRandomDecimalFromInterval,
   pickRandomIntFromInterval,
 } from "./utils";
 
 const bgCount = pickRandomIntFromInterval(100, 200);
-const bgShape = pickRandom([0, 1]);
+const bgShape = pickRandom([0, 1, 2]);
 
 export function BgObjects({
   bgColor,
@@ -104,6 +103,7 @@ export function BgObjects({
         getSizeByAspect(bgObjects[i].scale, aspect),
         getSizeByAspect(bgObjects[i].scale, aspect)
       );
+      tempObject.rotation.set(0, 0, Math.PI / 4);
       tempObject.updateMatrix();
 
       const id = i++;
@@ -126,6 +126,13 @@ export function BgObjects({
             args={[colorArray, 3]}
           />
         </circleBufferGeometry>
+      ) : bgShape === 2 ? (
+        <planeBufferGeometry args={[3, 2]} attach="geometry">
+          <instancedBufferAttribute
+            attachObject={["attributes", "color"]}
+            args={[colorArray, 3]}
+          />
+        </planeBufferGeometry>
       ) : (
         <ringBufferGeometry args={[0.99, 1, 64]} attach="geometry">
           <instancedBufferAttribute
@@ -134,13 +141,14 @@ export function BgObjects({
           />
         </ringBufferGeometry>
       )}
+
       <meshStandardMaterial
         blending={AdditiveBlending}
         depthWrite={false}
         toneMapped={false}
         transparent
         opacity={
-          bgShape === 0
+          bgShape === 0 || bgShape === 2
             ? colorContrast > 5
               ? 0.02
               : 0.05

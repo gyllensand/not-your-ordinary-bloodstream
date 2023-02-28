@@ -45,8 +45,9 @@ import { KernelSize } from "postprocessing";
 import { start } from "tone";
 import { BgObjects } from "./BgObjects";
 import { SpringValue } from "react-spring";
+import { HITS, HITSOUT } from "./App";
 
-const instrument = pickRandom([0, 1, 1]);
+export const instrument = pickRandom([0, 1]);
 const pitch = pickRandom(["C#-1", "D-1"]);
 const bgColor = pickRandom(BG_COLORS);
 const primaryColor = pickRandom(COLORS);
@@ -291,18 +292,24 @@ const generateShape = (params: ShapeParam, currentArray?: ShapeParam[]) => {
     !currentArray || currentArray.length > 1
       ? pickRandom([
           pickRandom([1, 2]),
+          ...[
+            !currentArray
+              ? pickRandomIntFromInterval(
+                  ringCounts[Math.round(params.radius) - 1][0],
+                  40
+                )
+              : pickRandomIntFromInterval(
+                  ringCounts[Math.round(params.radius) - 1][0],
+                  ringCounts[Math.round(params.radius) - 1][1]
+                ),
+          ],
           ...new Array(30)
             .fill(null)
             .map(() =>
-              !currentArray
-                ? pickRandomIntFromInterval(
-                    ringCounts[Math.round(params.radius) - 1][0],
-                    40
-                  )
-                : pickRandomIntFromInterval(
-                    ringCounts[Math.round(params.radius) - 1][0],
-                    ringCounts[Math.round(params.radius) - 1][1]
-                  )
+              pickRandomIntFromInterval(
+                ringCounts[Math.round(params.radius) - 1][0],
+                ringCounts[Math.round(params.radius) - 1][1]
+              )
             ),
         ])
       : pickRandomIntFromInterval(
@@ -395,13 +402,12 @@ const Shape = ({
   rings,
   texture,
   aspect,
-  index,
 }: {
   rings: RingProps[];
   texture: { map: Texture };
   aspect: number;
-  index: number;
 }) => {
+  const toneInitialized = useRef(false);
   const initialRenderDone = useRef(false);
   const isReentering = useRef(false);
   const [currentRings, setCurrentRings] = useState(rings);
@@ -417,6 +423,13 @@ const Shape = ({
       return;
     }
 
+    const pitch = pickRandom(
+      ["C#-2", "E#-2", "G#-2", "C#-1", "E#-1", "G#-1"],
+      Math.random
+    );
+
+    const audioSequence = currentRings.map(() => pickRandom(HITS, Math.random));
+    let currentSampleIndex = 0;
     isReentering.current = false;
     setRingSprings.stop();
     setRingSprings.start((i) => ({
@@ -425,6 +438,19 @@ const Shape = ({
       },
       to: {
         scale: [0, 0, 0],
+      },
+      onStart: async () => {
+        if (!toneInitialized.current) {
+          await start();
+          toneInitialized.current = true;
+        }
+
+        if (i % 3 !== 0 || !audioSequence[currentSampleIndex]) {
+          return;
+        }
+
+        audioSequence[currentSampleIndex].sampler.triggerAttack(pitch);
+        currentSampleIndex++;
       },
       onRest: () => {
         if (ringSprings.every(({ scale }) => scale.get()[0] === 0)) {
@@ -453,6 +479,12 @@ const Shape = ({
       return;
     }
 
+    const pitch = pickRandom(
+      ["C#-2", "E#-2", "G#-2", "C#-1", "E#-1", "G#-1"],
+      Math.random
+    );
+
+    HITSOUT[0].sampler.triggerAttack(pitch);
     isReentering.current = true;
 
     setRingSprings.start((i) => ({
@@ -620,9 +652,28 @@ const Ring = ({
 };
 
 const Scene = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
+  const controls = useRef<OrbitControlsImpl>(null);
   const { aspect } = useThree((state) => ({
     aspect: state.viewport.aspect,
   }));
+
+  useEffect(() => {
+    HITSOUT.forEach((hit) => {
+      if (instrument === 0) {
+        hit.sampler.volume.value = -10;
+      }
+
+      hit.sampler.toDestination();
+    });
+
+    HITS.forEach((hit) => {
+      if (instrument === 0) {
+        hit.sampler.volume.value = -10;
+      }
+
+      hit.sampler.toDestination();
+    });
+  }, []);
 
   useFrame((state) => {
     if (!controls.current || isMobile) {
@@ -634,7 +685,6 @@ const Scene = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
     controls.current.update();
   });
 
-  const controls = useRef<OrbitControlsImpl>(null);
   const texture = useTexture({
     map: `${process.env.PUBLIC_URL}/textures/pattern.jpg`,
   });
@@ -703,7 +753,6 @@ const Scene = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
               key={i}
               rings={shape}
               aspect={aspect}
-              index={i}
               texture={texturePattern === 0 ? texture : texture2}
             />
           </Float>
