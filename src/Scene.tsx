@@ -47,7 +47,7 @@ import { BgObjects } from "./BgObjects";
 import { SpringValue } from "react-spring";
 import { HITS, HITSOUT } from "./App";
 
-export const instrument = pickRandom([0, 1]);
+export const instrument = pickRandom([0, 1, 1]);
 const pitch = pickRandom(["C#-1", "D-1"]);
 const bgColor = pickRandom(BG_COLORS);
 const primaryColor = pickRandom(COLORS);
@@ -57,7 +57,7 @@ export const colorContrast = getColorContrast(
   hexToRgb(secondaryColor)
 );
 const hasbgPlane = pickRandom([
-  ...new Array(6).fill(null).map(() => false),
+  ...new Array(4).fill(null).map(() => false),
   true,
 ]);
 const bgPlaneType = pickRandom([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
@@ -91,8 +91,20 @@ const shapeParameters = new Array(shapeCount)
   .reduce<ShapeParam[]>((array, current, index) => {
     if (index === 0) {
       const currentRadius = pickRandomDecimalFromInterval(3, 5);
-      const x = pickRandomDecimalFromInterval(-4, 4);
-      const y = pickRandomDecimalFromInterval(-4, 4);
+      const x =
+        currentRadius > 4
+          ? pickRandom([
+              pickRandomDecimalFromInterval(-4, -2),
+              pickRandomDecimalFromInterval(2, 4),
+            ])
+          : pickRandomDecimalFromInterval(-4, 4);
+      const y =
+        currentRadius > 4
+          ? pickRandom([
+              pickRandomDecimalFromInterval(-4, -2),
+              pickRandomDecimalFromInterval(2, 4),
+            ])
+          : pickRandomDecimalFromInterval(-4, 4);
 
       array = [
         {
@@ -182,7 +194,7 @@ const shapeParameters = new Array(shapeCount)
     array.push(item);
     return array;
   }, []);
-
+console.log(shapeParameters);
 // @ts-ignore
 window.$fxhashFeatures = {
   instrument,
@@ -290,87 +302,155 @@ const ringCounts = [
 const generateShape = (params: ShapeParam, currentArray?: ShapeParam[]) => {
   const ringCount =
     !currentArray || currentArray.length > 1
-      ? pickRandom([
-          pickRandom([1, 2]),
-          ...[
-            !currentArray
-              ? pickRandomIntFromInterval(
+      ? pickRandom(
+          [
+            pickRandom([1, 2], currentArray ? undefined : Math.random),
+            ...[
+              !currentArray
+                ? pickRandomIntFromInterval(
+                    ringCounts[Math.round(params.radius) - 1][0],
+                    40,
+                    currentArray ? undefined : Math.random
+                  )
+                : pickRandomIntFromInterval(
+                    ringCounts[Math.round(params.radius) - 1][0],
+                    ringCounts[Math.round(params.radius) - 1][1],
+                    currentArray ? undefined : Math.random
+                  ),
+            ],
+            ...new Array(30)
+              .fill(null)
+              .map(() =>
+                pickRandomIntFromInterval(
                   ringCounts[Math.round(params.radius) - 1][0],
-                  40
+                  ringCounts[Math.round(params.radius) - 1][1],
+                  currentArray ? undefined : Math.random
                 )
-              : pickRandomIntFromInterval(
-                  ringCounts[Math.round(params.radius) - 1][0],
-                  ringCounts[Math.round(params.radius) - 1][1]
-                ),
+              ),
           ],
-          ...new Array(30)
-            .fill(null)
-            .map(() =>
-              pickRandomIntFromInterval(
-                ringCounts[Math.round(params.radius) - 1][0],
-                ringCounts[Math.round(params.radius) - 1][1]
-              )
-            ),
-        ])
+          currentArray ? undefined : Math.random
+        )
       : pickRandomIntFromInterval(
           ringCounts[Math.round(params.radius) - 1][0],
-          ringCounts[Math.round(params.radius) - 1][1]
+          ringCounts[Math.round(params.radius) - 1][1],
+          currentArray ? undefined : Math.random
         );
 
   const factor = pickRandomDecimalFromInterval(
     ringFactors[Math.round(params.radius) - 1][0],
-    ringFactors[Math.round(params.radius) - 1][1]
+    ringFactors[Math.round(params.radius) - 1][1],
+    2,
+    currentArray ? undefined : Math.random
   );
-  const theta = pickRandomDecimalFromInterval(-Math.PI * 2, Math.PI * 2);
+  const theta = pickRandomDecimalFromInterval(
+    -Math.PI * 2,
+    Math.PI * 2,
+    2,
+    currentArray ? undefined : Math.random
+  );
   const innerRadiusOffset = pickRandomDecimalFromInterval(
     radiusOffsets[Math.round(params.radius) - 1][0],
-    radiusOffsets[Math.round(params.radius) - 1][1]
+    radiusOffsets[Math.round(params.radius) - 1][1],
+    2,
+    currentArray ? undefined : Math.random
   );
   const hasTexture =
     !currentArray || hasTexturePattern
-      ? pickRandom([...new Array(2).fill(null).map(() => false), true])
+      ? pickRandom(
+          [...new Array(2).fill(null).map(() => false), true],
+          currentArray ? undefined : Math.random
+        )
       : false;
 
   const hasBackground = hasTexture
     ? true
     : ringCount < 2
     ? false
-    : pickRandom([...new Array(7).fill(null).map(() => false), true]);
+    : pickRandom(
+        [...new Array(7).fill(null).map(() => false), true],
+        currentArray ? undefined : Math.random
+      );
 
-  const backgroundIndex = hasTexture || !hasBackground ? 0 : pickRandom([0, 1]);
+  const backgroundIndex =
+    hasTexture || !hasBackground
+      ? 0
+      : pickRandom([0, 1], currentArray ? undefined : Math.random);
 
   return new Array(ringCount).fill(null).map<RingProps>((o, index) => {
-    const alteredIndex = pickRandom([
-      ...new Array(8).fill(null).map(() => index),
-      pickRandom([...new Array(ringCount).fill(null).map((_, i) => i)]),
-    ]);
+    const alteredIndex = pickRandom(
+      [
+        ...new Array(8).fill(null).map(() => index),
+        pickRandom(
+          [...new Array(ringCount).fill(null).map((_, i) => i)],
+          currentArray ? undefined : Math.random
+        ),
+      ],
+      currentArray ? undefined : Math.random
+    );
 
     const innerRadius =
       ringCount < 2
         ? params.radius / 2
         : params.radius - innerRadiusOffset - alteredIndex * 0.1;
     const outerRadius = params.radius - alteredIndex * 0.1;
-    const color = pickRandomColorWithTheme(
-      !currentArray ? pickRandom([primaryColor, secondaryColor]) : primaryColor,
-      COLORS,
-      COLORS.length * 3
-    );
+    const color = !currentArray
+      ? pickRandomColorWithTheme(
+          primaryColor,
+          COLORS,
+          COLORS.length,
+          Math.random
+        )
+      : pickRandomColorWithTheme(primaryColor, COLORS, COLORS.length * 3);
+
     const thetaStart = pickRandomDecimalFromInterval(
-      theta - pickRandomDecimalFromInterval(0.05, 0.1),
-      theta + pickRandomDecimalFromInterval(0.05, 0.1)
+      theta -
+        pickRandomDecimalFromInterval(
+          0.05,
+          0.1,
+          2,
+          currentArray ? undefined : Math.random
+        ),
+      theta +
+        pickRandomDecimalFromInterval(
+          0.05,
+          0.1,
+          2,
+          currentArray ? undefined : Math.random
+        ),
+      2,
+      currentArray ? undefined : Math.random
     );
-    const thetaLength = pickRandom([
-      Math.PI * 2,
-      Math.PI * 2,
-      Math.PI * 1.5,
-      pickRandomDecimalFromInterval(Math.PI * 1.9, Math.PI * 2),
-      pickRandomDecimalFromInterval(Math.PI * 1.9, Math.PI * 2),
-    ]);
+    const thetaLength = pickRandom(
+      [
+        Math.PI * 2,
+        Math.PI * 2,
+        Math.PI * 1.5,
+        pickRandomDecimalFromInterval(
+          Math.PI * 1.9,
+          Math.PI * 2,
+          2,
+          currentArray ? undefined : Math.random
+        ),
+        pickRandomDecimalFromInterval(
+          Math.PI * 1.9,
+          Math.PI * 2,
+          2,
+          currentArray ? undefined : Math.random
+        ),
+      ],
+      currentArray ? undefined : Math.random
+    );
     const wireframe =
       ringCount === 1 && params.radius > 3
         ? false
-        : pickRandom([false, false, false, false, true]);
-    const metalness = pickRandom([0, 0.8]);
+        : pickRandom(
+            [false, false, false, false, true],
+            currentArray ? undefined : Math.random
+          );
+    const metalness = pickRandom(
+      [0, 0.8],
+      currentArray ? undefined : Math.random
+    );
 
     return {
       roughness: metalness === 0 ? 1 : 0.4,
@@ -418,7 +498,7 @@ const Shape = ({
     })
   );
 
-  const onShapePress = useCallback(() => {
+  const onShapePress = useCallback(async () => {
     if (!isReentering.current) {
       return;
     }
@@ -427,6 +507,11 @@ const Shape = ({
       ["C#-2", "E#-2", "G#-2", "C#-1", "E#-1", "G#-1"],
       Math.random
     );
+
+    if (!toneInitialized.current) {
+      await start();
+      toneInitialized.current = true;
+    }
 
     const audioSequence = currentRings.map(() => pickRandom(HITS, Math.random));
     let currentSampleIndex = 0;
@@ -439,17 +524,15 @@ const Shape = ({
       to: {
         scale: [0, 0, 0],
       },
-      onStart: async () => {
-        if (!toneInitialized.current) {
-          await start();
-          toneInitialized.current = true;
-        }
-
+      onStart: () => {
         if (i % 3 !== 0 || !audioSequence[currentSampleIndex]) {
           return;
         }
 
-        audioSequence[currentSampleIndex].sampler.triggerAttack(pitch);
+        if (toneInitialized.current) {
+          audioSequence[currentSampleIndex].sampler.triggerAttack(pitch);
+        }
+
         currentSampleIndex++;
       },
       onRest: () => {
@@ -484,8 +567,13 @@ const Shape = ({
       Math.random
     );
 
-    HITSOUT[0].sampler.triggerAttack(pitch);
-    isReentering.current = true;
+    if (toneInitialized.current) {
+      HITSOUT[0].sampler.triggerAttack(pitch);
+    }
+
+    setTimeout(() => {
+      isReentering.current = true;
+    }, 100);
 
     setRingSprings.start((i) => ({
       from: {
@@ -706,26 +794,6 @@ const Scene = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
     texture2[key as keyof typeof texture2].repeat.y = 2;
   });
 
-  const onPointerDown = useCallback(() => {}, []);
-
-  const onPointerUp = useCallback(() => {}, []);
-
-  useEffect(() => {
-    const canvas = canvasRef?.current;
-
-    if (!canvas) {
-      return;
-    }
-
-    canvas.addEventListener("pointerdown", onPointerDown);
-    canvas.addEventListener("pointerup", onPointerUp);
-
-    return () => {
-      canvas.removeEventListener("pointerdown", onPointerDown);
-      canvas.removeEventListener("pointerup", onPointerUp);
-    };
-  }, [onPointerDown, onPointerUp, canvasRef]);
-
   const linePaths = useMemo(
     () => shapes.map((o) => ({ x: o[0].posX, y: o[0].posY })),
     []
@@ -804,22 +872,6 @@ const Scene = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
         />
         <Noise opacity={0.1} />
       </EffectComposer>
-
-      {/* {!isMobile ? (
-        <EffectComposer>
-          <Bloom
-            kernelSize={KernelSize.LARGE}
-            luminanceThreshold={0}
-            luminanceSmoothing={0.4}
-            intensity={0.6}
-          />
-          <Noise opacity={0.1} />
-        </EffectComposer>
-      ) : (
-        <EffectComposer>
-          <Noise opacity={0.1} />
-        </EffectComposer>
-      )} */}
     </>
   );
 };

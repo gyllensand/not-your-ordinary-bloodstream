@@ -2,7 +2,6 @@ import { Suspense, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import Scene, { instrument } from "./Scene";
 import { Sampler } from "tone";
-import { Stats } from "@react-three/drei";
 
 console.log(
   "%c * Computer Emotions * ",
@@ -137,7 +136,6 @@ const App = () => {
     >
       <Suspense fallback={null}>
         <Scene canvasRef={canvasRef} />
-        <Stats />
       </Suspense>
     </Canvas>
   );

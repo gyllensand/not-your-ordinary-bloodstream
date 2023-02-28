@@ -110,11 +110,12 @@ export const rgbToHex = (r: number, g: number, b: number) =>
 export const pickRandomColorWithTheme = (
   color: string,
   theme: string[],
-  count: number
+  count: number,
+  rndFn = fxrand
 ) => {
   const primaryColor = new Array(count).fill(null).map(() => color);
 
-  return pickRandom([...primaryColor, ...theme]);
+  return pickRandom([...primaryColor, ...theme], rndFn);
 };
 
 export const easeInOutSine = (t: number, b: number, _c: number, d: number) => {
