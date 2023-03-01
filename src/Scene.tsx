@@ -48,7 +48,6 @@ import { SpringValue } from "react-spring";
 import { HITS, HITSOUT } from "./App";
 
 export const instrument = pickRandom([0, 1, 1]);
-const pitch = pickRandom(["C#-1", "D-1"]);
 const bgColor = pickRandom(BG_COLORS);
 const primaryColor = pickRandom(COLORS);
 const secondaryColor = pickRandom(STRIPE_COLORS);
@@ -57,7 +56,7 @@ export const colorContrast = getColorContrast(
   hexToRgb(secondaryColor)
 );
 const hasbgPlane = pickRandom([
-  ...new Array(4).fill(null).map(() => false),
+  ...new Array(3).fill(null).map(() => false),
   true,
 ]);
 const bgPlaneType = pickRandom([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
@@ -194,16 +193,6 @@ const shapeParameters = new Array(shapeCount)
     array.push(item);
     return array;
   }, []);
-console.log(shapeParameters);
-// @ts-ignore
-window.$fxhashFeatures = {
-  instrument,
-  pitch,
-  bgColor,
-  primaryColor,
-  secondaryColor,
-  shapeCount,
-};
 
 function Line({
   start,
@@ -273,6 +262,7 @@ interface RingProps {
   posY: number;
   metalness: number;
   roughness: number;
+  composition: number;
 }
 
 const ringFactors = [
@@ -452,9 +442,22 @@ const generateShape = (params: ShapeParam, currentArray?: ShapeParam[]) => {
       currentArray ? undefined : Math.random
     );
 
+    const composition =
+      ringCount +
+      metalness +
+      color.charCodeAt(6) +
+      params.x +
+      params.y +
+      thetaStart +
+      thetaLength +
+      innerRadius +
+      outerRadius +
+      params.radius +
+      factor;
+
     return {
       roughness: metalness === 0 ? 1 : 0.4,
-      metalness: metalness,
+      metalness,
       innerRadius,
       outerRadius,
       color,
@@ -470,6 +473,7 @@ const generateShape = (params: ShapeParam, currentArray?: ShapeParam[]) => {
       hasBackground,
       backgroundIndex,
       hasTexture,
+      composition,
     };
   });
 };
@@ -477,6 +481,26 @@ const generateShape = (params: ShapeParam, currentArray?: ShapeParam[]) => {
 const shapes = shapeParameters.map((params) =>
   generateShape(params, shapeParameters)
 );
+
+const shapeComposition = shapes.reduce(
+  (total, value) =>
+    (total += value.reduce((total, value) => (total += value.composition), 0)),
+  0
+);
+
+// @ts-ignore
+window.$fxhashFeatures = {
+  instrument,
+  bgColor,
+  primaryColor,
+  secondaryColor,
+  shapeCount,
+  shapeParameters,
+  shapeComposition,
+  hasMetalness,
+  hasLines,
+  hasTexturePattern,
+};
 
 const Shape = ({
   rings,
