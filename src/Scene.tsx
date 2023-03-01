@@ -771,7 +771,7 @@ const Scene = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
   useEffect(() => {
     HITSOUT.forEach((hit) => {
       if (instrument === 0) {
-        hit.sampler.volume.value = -10;
+        hit.sampler.volume.value = -15;
       }
 
       hit.sampler.toDestination();
