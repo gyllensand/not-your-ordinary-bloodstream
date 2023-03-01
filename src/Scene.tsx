@@ -495,7 +495,6 @@ window.$fxhashFeatures = {
   primaryColor,
   secondaryColor,
   shapeCount,
-  shapeParameters,
   shapeComposition,
   hasMetalness,
   hasLines,
